@@ -8,6 +8,8 @@ class Outs(object):
         self.__straight_list = self.__utils.create_straight_list()
         self.__player_hand = []
         self.__board = []
+        self.__outs = []
+        self.__combination = ""
         
     def set_player_hand(self, player_hand):
         self.__player_hand = player_hand
@@ -25,7 +27,7 @@ class Outs(object):
         self.__check_for_four_of_a_kind()
         self.__check_for_full_house()
         self.__check_for_flush()
-        self.__check_for_straight_flush()
+        self.__check_for_straight()
 
     def __check_for_royal_flush(self):
         # Combine the player's hand and board cards into a single list
@@ -33,8 +35,6 @@ class Outs(object):
         straight_list = self.__straight_list
 
         cards = []
-        self.__outs = []
-        self.__combination = ""
         for suit in ["C", "H", "D", "S"]:
             check_sum = 0
             for card in all_cards:
@@ -42,15 +42,14 @@ class Outs(object):
                     check_sum += 1
                     cards.append(card[0])
 
-            res_list = list(straight_list[0])
-            if 5 - check_sum == 0:
-                self.__combination = "flush_royal"
-            elif 5 - check_sum == 1:
-                for card in cards:
-                    res_list.remove(card)
-                self.__outs += [hand + suit for hand in res_list]
-            else:
-                self.__outs += []
+            if check_sum >= 4:
+                res_list = list(straight_list[0])
+                if 5 - check_sum == 0:
+                    self.__combination = "flush_royal"
+                elif 5 - check_sum == 1:
+                    for card in cards:
+                        res_list.remove(card)
+                    self.__outs += [hand + suit for hand in res_list]
 
     def __check_for_straight_flush(self):
         # Combine the player's hand and board cards into a single list
@@ -58,11 +57,8 @@ class Outs(object):
         straight_list = self.__straight_list
     
         cards = []
-        self.__outs = []
-        self.__combination = ""
         check_sum = 0
         for suit in ["C", "H", "D", "S"]:
-    
             for a_straight in straight_list:
                 for card in all_cards:
                     if card[0] in a_straight and suit == card[1]:
@@ -82,38 +78,30 @@ class Outs(object):
                         self.__outs += []
                 check_sum = 0
     
-        self.__outs = list(set(self.__outs))
+        self.__outs += list(set(self.__outs))
 
     def __check_for_four_of_a_kind(self):
         # Combine the player's hand and board cards into a single list
         all_cards = self.__player_hand + self.__board
 
         # Analyze the cards
-        sorted_all_cards = self.__utils.analyze_cards(all_cards)
-        first_letters = [card[0] for card in sorted_all_cards]
+        _, sorted_all_unique_cards = self.__utils.analyze_cards(all_cards)
+        first_letters = [card[0] for card in sorted_all_unique_cards]
         letter_count = {letter: first_letters.count(letter) for letter in set(first_letters)}
 
         most_frequent_letter = max(letter_count, key=lambda letter: letter_count[letter])
         suit_list = ["C", "H", "D", "S"]
-        self.__combination = ""
-        self.__outs = []
         if 3 in letter_count.values():
-            for card in sorted_all_cards:
+            for card in sorted_all_unique_cards:
                 if most_frequent_letter in card:
                     suit_list.remove(card[1])
                     self.__outs = suit_list
-            self.__out = [most_frequent_letter + self.__outs[0]]
+            self.__outs += [most_frequent_letter + self.__outs[0]]
         elif 4 in letter_count.values():
             self.__combination = "four_of_a_kind"
-            self.__out = []
-        else:
-            self.__combination = ""
-            self.__out = []
 
     def __check_for_full_house(self):
         cards = []
-        self.__outs = []
-        self.__combination = ""
         check_1 = check_2 = False
 
         # Combine the player's hand and board cards into a single list
@@ -138,8 +126,6 @@ class Outs(object):
     def __check_for_flush(self):
         # Combine the player's hand and board cards into a single list
         all_cards = self.__player_hand + self.__board
-        self.__combination = ""
-        self.__outs = []
     
         suit_list = ["C", "H", "D", "S"]
         for suit in suit_list:
@@ -147,13 +133,15 @@ class Outs(object):
             for card in all_cards:
                 if suit in card:
                     check += 1
-            if check == 4:
-                card_list = "AKQJT98765432"
-                for rank in card_list:
-                    self.__outs.append(rank + suit)
-            elif check == 5:
-                self.__combination = "flush"
-                self.__outs = []
+            if check >= 4:
+                if check == 4:
+                    card_list = "AKQJT98765432"
+                    for rank in card_list:
+                        self.__outs.append(rank + suit)
+                elif check == 5:
+                    self.__combination = "flush"
+                    self.__outs += []
+                    break
 
     def __check_for_straight(self):
         # Combine the player's hand and board cards into a single list
@@ -163,13 +151,12 @@ class Outs(object):
         sorted_all_cards, unique_first_letters = self.__utils.analyze_cards(all_cards)
 
         unique_first_letters = ''.join(unique_first_letters)
-        straight_list = self.__straight_list()
-
-        self.__outs = []
-        self.__combination = ""
-        for check_straight in straight_list:
+        temp_outs = []
+        for check_straight in self.__straight_list:
             check_sum = 0
             cards = []
+
+
             for card in unique_first_letters:
                 if card in check_straight:
                     check_sum += 1
@@ -180,24 +167,26 @@ class Outs(object):
             if 5 - check_sum == 1:
                 for card in cards:
                     res_list.remove(card)
-                self.__outs += res_list
+                temp_outs += res_list
             if 5 - check_sum == 0:
                 straight_flush_high_card = check_straight[0]
-                self.__combination = f"straight_flush_from_{straight_flush_high_card}"
+                self.__combination = f"straight_from_{straight_flush_high_card}"
 
-        poker_hands_with_suits = []
-        for suit in ["C", "H", "D", "S"]:
-            poker_hands_with_suits += [hand + suit for hand in self.__outs]
+        if len(temp_outs) > 0:
+            poker_hands_with_suits = []
+            for suit in ["C", "H", "D", "S"]:
+                poker_hands_with_suits += [hand + suit for hand in temp_outs]
 
         straight_flush_high_card = ""
 
-        if self.__combination != "":
+        if self.__combination.startswith("straight_from_"):
             actual_out_list = []
             for card in poker_hands_with_suits:
                 actual_out = self.__utils.check_card(card[0], straight_flush_high_card)
                 if len(actual_out) > 0:
                     for suit in ["C", "H", "D", "S"]:
                         actual_out_list += [actual_out + suit]
+                        self.__outs = actual_out_list
                     break
-
-            self.__outs = actual_out_list
+        else:
+            self.__outs += poker_hands_with_suits
