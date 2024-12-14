@@ -1,0 +1,23 @@
+models:
+  board_detector:
+    path: './src/models/board_detector.pt'
+  bet_detector:
+    path: './src/models/bet_detector.pt'
+  player-pot_detector:
+    path: './src/models/pot_detector.pt'
+  accepted_pot_detector:
+    path: './src/models/accepted_pot_detector.pt'
+  non_accepted_pot_detector:
+    path: './src/models/non_accepted_pot_detector.pt'
+  card_detector:
+    path: './src/models/card_detector.pt'
+
+server:
+  url: '103.90.73.217'
+
+logging:
+  level: 'INFO'
+  path: '/var/log/poker_analyzer'
+
+board:
+  players: 6

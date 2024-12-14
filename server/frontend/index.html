@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Игровое обновление</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        #updates {
+            display: flex;
+            flex-direction: column; /* Вертикальное расположение внешних блоков */
+            gap: 20px; /* Промежуток между внешними блоками */
+        }
+
+        .update {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 15px;
+        }
+
+        .player-block {
+            display: flex; /* Горизонтальное расположение карточек внутри блока */
+            gap: 10px; /* Промежуток между карточками */
+        }
+
+        .player-card {
+            background-color: #e7f3fe; /* Цвет фона для карточек игроков */
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            flex: 1; /* Карточки занимают равное пространство */
+        }
+    </style>
+</head>
+<body>
+    <h1>Обновления игры</h1>
+    <div id="updates">
+        <div id="player-updates" class="update">
+            <div class="player-block" id="player-updates-1"></div> <!-- Блок для первых четырех игроков -->
+            <div class="player-block" id="player-updates-2"></div> <!-- Блок для следующих четырех игроков в обратном порядке -->
+        </div>
+        <div id="board-update" class="update"></div> <!-- Блок обновлений для стола -->
+        <div id="action-update" class="update"></div> <!-- Блок обновлений для действий -->
+        <div id="counter-update" class="update"></div> <!-- Блок обновлений для счётчика -->
+        <div id="advice-update" class="update"></div> <!-- Блок обновлений для совета -->
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const eventSource = new EventSource('http://103.90.73.217:8001/stream');
+
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log("Parsed data:", data);
+
+                // Обновление блоков с данными
+                updatePlayers(data);
+                updateBoard(data.board, data.not_accepted_bet); // Передаем непринятую ставку
+                updateAction(data.action);
+                updateCounter(data.counter);
+                updateAdvice(data.advice); // Если у вас есть данные о совете
+            };
+
+            function updatePlayers(data) {
+                const playerUpdates1 = document.getElementById('player-updates-1');
+                const playerUpdates2 = document.getElementById('player-updates-2');
+
+                playerUpdates1.innerHTML = ""; 
+                playerUpdates2.innerHTML = ""; 
+
+                for (let player = 1; player <= 8; player++) {
+                    const playerData = data[player] || {};
+                    const potValue = playerData.pot || 'Игрок сбросил карты';
+                    const betValue = playerData.bet || 'ставка отсутствует';
+                    const isInGameText = playerData.in_game ? ' в игре' : ' Сбросил карты';
+
+                    const playerCard = document.createElement('div');
+                    playerCard.className = 'player-card';
+
+                    // Каждая карточка игрока содержит строки информации
+                    playerCard.innerHTML = `
+                        <p>Игрок ${player}${isInGameText}</p>
+                        <p>Пот: ${potValue} BB</p>
+                        <p>Текущая ставка: ${betValue} BB</p>
+                    `;
+
+                    // Добавляем игрока в соответствующий блок
+                    if (player <= 4) {
+                        playerUpdates1.appendChild(playerCard); // Первые четыре игрока
+                    } else {
+                        playerUpdates2.appendChild(playerCard); // Последние четыре игрока
+                    }
+                }
+            }
+
+            function updateBoard(board, notAcceptedBet) {
+                const boardUpdateDiv = document.getElementById('board-update');
+                
+                boardUpdateDiv.innerHTML = ""; // Очистка предыдущего содержимого
+
+                if (board && typeof board === 'object') {
+                    boardUpdateDiv.innerHTML = `
+                        <p>Карты на доске: ${board.cards.length > 0 ? board.cards.join(', ') : 'Нет'}</p>
+                        <p>Принятая ставка: $${board.actual_bet}</p>
+                        <p>Непринятая ставка: $${board.potential_bet || 'Нет'}</p> <!-- Добавлено отображение непринятой ставки -->
+                    `;
+                }
+            }
+
+            function updateAction(action) {
+                const actionUpdateDiv = document.getElementById('action-update');
+                
+                actionUpdateDiv.innerHTML = `<p>Действие игрока: ${action}</p>`;
+            }
+
+            function updateCounter(counter) {
+                const counterUpdateDiv = document.getElementById('counter-update');
+                
+                counterUpdateDiv.innerHTML = `
+                <p>Внутреняя информация</p> 
+                <p>Кол-во рук: ${counter.hand}</p>
+                <p>Порядковый номер хода: ${counter.action}</p>
+                `;
+            }
+
+            function updateAdvice(advice) {
+                const adviceUpdateDiv = document.getElementById('advice-update');
+                
+                adviceUpdateDiv.innerHTML = `<p>Совет: ${advice || 'Нет совета'}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
+
