@@ -95,3 +95,36 @@ def sort_cards(list_of_cards: list) -> list:
 
     # Sort the list of cards based on rank and suit
     return sorted(list_of_cards, key=card_sort_key)
+
+def convert_json_to_prompt(table_data: dict):
+    prompt_lines = []
+
+    # Board information
+    board = table_data["board"]
+    dealer_position = board["dealer_position"]
+    prompt_lines.append(f"The dealer is in position {dealer_position}.")
+
+    # Player information
+    player = table_data["player"]
+    player_position = player["position"]
+    player_cards = ", ".join(player["cards"]) if player["cards"] else 'No cards'
+    prompt_lines.append(f"You are in position {player_position} with cards: {player_cards}.")
+
+    # Collecting information about other players at the table
+    for position, info in table_data.items():
+        if position not in ["board", "player", 'out_of_table', 'advice', 'action_started', 'action_ended',
+                            'current_prompt_id']:
+            pot = info["pot"]
+            bet = info["bet"]
+            in_game_status = 'in the game' if info["in_game"] else 'out of the game'
+
+            prompt_lines.append(
+                f"Player in position {position} has a pot of {pot} and a bet of {bet}, currently {in_game_status}.")
+
+    # Additional game state information
+    potential_bet = board["potential_bet"]
+    actual_bet = board["actual_bet"]
+
+    prompt_lines.append(f"The potential bet is {potential_bet} and the actual bet is {actual_bet}.")
+
+    return "\n".join(prompt_lines)

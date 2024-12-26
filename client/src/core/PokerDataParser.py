@@ -3,9 +3,9 @@ from client.src.core.Predictor import Predictor
 from client.src.utils.DataProcessor import extract_digits_from_predictions, extract_card_from_predictions, sort_cards
 from client.src.utils.ScreenCapture import ScreenCapture
 
+import random
 import redis
 import json
-
 
 screen_capture = ScreenCapture()
 poker_table_distributor = PokerTableDistributor()
@@ -214,6 +214,13 @@ class PokerDataParser(object):
 
         self.__overall['action_started'] = True if not PREV_ACTION and CURRENT_ACTION else False
         self.__overall['action_ended'] = False if not PREV_ACTION and CURRENT_ACTION else True
+
+        if self.client.get('game-data')['new_hand']:
+            table_data['new_hand'] = False
+            JSON_DATA = json.dumps(table_data)
+            self.client.set('game-data', JSON_DATA)
+            self.__overall['current_prompt_id'] = random.choice(range(1, 11))
+            print(self.__overall['current_prompt_id'])
 
         self.__update_player_data()
 

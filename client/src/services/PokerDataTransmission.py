@@ -1,7 +1,6 @@
 import json
 import redis
 from client.src.utils.DataProcessor import convert_string_to_hash
-import random
 
 
 class DataTransmission:
@@ -27,6 +26,7 @@ class DataTransmission:
             self.__ACTION = 0
             self.__INIT_POT_REMEMBERED = False
             self.__PROMPT_ID_REMEMBERED = False
+            table_data['new_hand'] = True
             self.__HASH = convert_string_to_hash(STR=json.dumps(table_data))
             self.__PREV_DEALER_POSITION = CURRENT_DEALER_POSITION
 
@@ -50,6 +50,12 @@ class DataTransmission:
                 self.__PREV_PLAYER_POT = CURRENT_POT
                 self.__INIT_POT_REMEMBERED = True
 
+    def __prepare_analytics_data(self, table_data: dict) -> None:
+        if not self.__PROMPT_ID_REMEMBERED and table_data['player']['position'] != '-':
+            self.__analytics: dict = {'prompt_id': self.__PREV_PROMPT_ID, 'diff': self.__DIFF_WITH_PREV_HAND}
+            self.__PREV_PROMPT_ID = table_data['current_prompt_id']
+            self.__PROMPT_ID_REMEMBERED = True
+
     def __send_table_data(self, updated_data: dict):
         DATA_IS_READY_TO_BE_SENT: bool = self.__check_data_for_consistency(json_data=updated_data)
         if DATA_IS_READY_TO_BE_SENT:
@@ -59,24 +65,18 @@ class DataTransmission:
 
     def __send_analytics_data(self, analytics_data: dict):
         ANALYTICS_JSON_DATA: str = json.dumps(analytics_data)
-        self.client.set("game-data", ANALYTICS_JSON_DATA)
-
-    def __prepare_and_send_analytics_data(self, table_data: dict):
-        CURRENT_PROMPT_ID = random.choice(range(1, 11))
-        if not self.__PROMPT_ID_REMEMBERED and table_data['player']['position'] != '-':
-            self.__PROMPT_ID_REMEMBERED = True
-            self.__analytics: dict = {'prompt_id': self.__PREV_PROMPT_ID, 'diff': self.__DIFF_WITH_PREV_HAND}
-            self.__PREV_PROMPT_ID = CURRENT_PROMPT_ID
-
-            self.__send_analytics_data(analytics_data=self.__analytics)
+        self.client.set("analytics", ANALYTICS_JSON_DATA)
 
     def send_poker_data(self, table_data: dict):
         updated_data: dict = self.__update_hand_id(table_data=table_data)
         updated_data: dict = self.__update_action_phase(table_data=updated_data)
         self.__update_init_player_pot(table_data=updated_data)
-        self.__prepare_and_send_analytics_data(table_data=self.__analytics)
+        # self.__prepare_analytics_data(table_data=updated_data)
         self.__send_table_data(updated_data=updated_data)
-
+        '''
+        if self.__ACTION == 0:
+            self.__send_analytics_data(analytics_data=self.__analytics)
+        '''
 
     @staticmethod
     def __check_data_for_consistency(json_data):

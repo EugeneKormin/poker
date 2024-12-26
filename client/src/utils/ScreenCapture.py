@@ -8,7 +8,7 @@ import win32con
 import win32gui
 
 
-from src.utils.DataProcessor import get_title
+from client.src.utils.DataProcessor import get_title
 
 
 class ScreenCapture(object):
