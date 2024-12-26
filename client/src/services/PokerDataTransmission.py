@@ -1,70 +1,90 @@
 import json
 import redis
-from src.utils.DataProcessor import convert_string_to_hash
+from client.src.utils.DataProcessor import convert_string_to_hash
+import random
 
 
 class DataTransmission:
-    def __init__(self, SERVER_URL: str):
-        self.redis_host = SERVER_URL
-        self.redis_port = 6379
+    def __init__(self, config: dict):
+        self.redis_host = config['server']['url']
+        self.redis_port = config['server']['redis_port']
         self.client = redis.StrictRedis(host=self.redis_host, port=self.redis_port, decode_responses=True)
-        self.__first_game = True
+        self.__ACTION = -1
+        self.__HASH = ''
+        self.__CURRENT_POT = -1
+        self.__INIT_POT_REMEMBERED = False
+        self.__PROMPT_ID_REMEMBERED = False
+        self.__PREV_DEALER_POSITION = -1
+        self.__PREV_PLAYER_POT = 0
+        self.__DIFF_WITH_PREV_HAND = 0
+        self.__PREV_PROMPT_ID = -1
+        self.__analytics: dict = {'prompt_id': self.__PREV_PROMPT_ID, 'diff': self.__DIFF_WITH_PREV_HAND}
+
+    def __update_hand_id(self, table_data: dict) -> dict:
+        CURRENT_DEALER_POSITION = table_data['board']['dealer_position']
+
+        if CURRENT_DEALER_POSITION != self.__PREV_DEALER_POSITION:
+            self.__ACTION = 0
+            self.__INIT_POT_REMEMBERED = False
+            self.__PROMPT_ID_REMEMBERED = False
+            self.__HASH = convert_string_to_hash(STR=json.dumps(table_data))
+            self.__PREV_DEALER_POSITION = CURRENT_DEALER_POSITION
+
+        table_data['board']['hand_id'] = f'{self.__HASH[:4]}...{self.__HASH[-4:]}'
+        return table_data
+
+    def __update_action_phase(self, table_data: dict) -> dict:
+        if table_data['action_started']:
+            self.__ACTION += 1
+            self.__POT = table_data['player']['pot']
+
+        table_data['player']['action_counter'] = self.__ACTION
+        return table_data
+
+    def __update_init_player_pot(self, table_data: dict):
+        if not self.__INIT_POT_REMEMBERED:
+            BET = 0 if table_data['player']['bet'] == '-' else float(table_data['player']['bet'])
+            if table_data['player']['pot'] != '-':
+                CURRENT_POT = float(table_data['player']['pot']) + BET
+                self.__DIFF_WITH_PREV_HAND = CURRENT_POT - self.__PREV_PLAYER_POT
+                self.__PREV_PLAYER_POT = CURRENT_POT
+                self.__INIT_POT_REMEMBERED = True
+
+    def __send_table_data(self, updated_data: dict):
+        DATA_IS_READY_TO_BE_SENT: bool = self.__check_data_for_consistency(json_data=updated_data)
+        if DATA_IS_READY_TO_BE_SENT:
+            UPDATED_JSON_DATA: str = json.dumps(updated_data)
+            self.client.set("game-data", UPDATED_JSON_DATA)
+            self.client.publish('my_channel', UPDATED_JSON_DATA)
+
+    def __send_analytics_data(self, analytics_data: dict):
+        ANALYTICS_JSON_DATA: str = json.dumps(analytics_data)
+        self.client.set("game-data", ANALYTICS_JSON_DATA)
+
+    def __prepare_and_send_analytics_data(self, table_data: dict):
+        CURRENT_PROMPT_ID = random.choice(range(1, 11))
+        if not self.__PROMPT_ID_REMEMBERED and table_data['player']['position'] != '-':
+            self.__PROMPT_ID_REMEMBERED = True
+            self.__analytics: dict = {'prompt_id': self.__PREV_PROMPT_ID, 'diff': self.__DIFF_WITH_PREV_HAND}
+            self.__PREV_PROMPT_ID = CURRENT_PROMPT_ID
+
+            self.__send_analytics_data(analytics_data=self.__analytics)
 
     def send_poker_data(self, table_data: dict):
-        DATA_IS_READY_TO_BE_SENT: bool = self.__check_data_for_consistency(json_data=table_data)
+        updated_data: dict = self.__update_hand_id(table_data=table_data)
+        updated_data: dict = self.__update_action_phase(table_data=updated_data)
+        self.__update_init_player_pot(table_data=updated_data)
+        self.__prepare_and_send_analytics_data(table_data=self.__analytics)
+        self.__send_table_data(updated_data=updated_data)
 
-        # and table_data['action']
-        if DATA_IS_READY_TO_BE_SENT:
-            previous_data: str = self.client.get('game-data')
-            if previous_data is None:
-                previous_data = ''
-            current_data: str = json.dumps(table_data)
-
-            NEW_HASH = convert_string_to_hash(STR=previous_data)
-            CURRENT_HASH = convert_string_to_hash(STR=current_data)
-
-            if NEW_HASH != CURRENT_HASH:
-
-                if previous_data == '':
-                    PREV_DEALER_POSITION = 0
-                else:
-                    PREV_DEALER_POSITION = json.loads(previous_data)['board']['dealer_position']
-                CURRENT_DEALER_POSITION = json.loads(current_data)['board']['dealer_position']
-
-                HAND, ACTION = self.__get_counter()
-                if CURRENT_DEALER_POSITION != PREV_DEALER_POSITION or self.__first_game:
-                    HAND += 1
-                    ACTION = 0
-                    self.__first_game = False
-                else:
-                    HAND = HAND
-                    ACTION += 1
-
-                updated_counter = {'hand': HAND, 'action': ACTION}
-                table_data['counter']['hand'], table_data['counter']['action'] = HAND, ACTION
-
-                json_data = json.dumps(table_data)
-
-                self.client.set('hash', NEW_HASH)
-                self.client.set("game-data", json_data)
-                self.client.set('counter', json.dumps(updated_counter))
-                self.client.publish('my_channel', json_data)
 
     @staticmethod
     def __check_data_for_consistency(json_data):
         for K, v in json_data.items():
             if K in [1, 2, 3, 4, 5, 6, 7, 8]:
-                if (v['in_game'] and v['pot'] != '-') or not v['in_game']:
-                    pass
-                else:
-                    return False
+                if v['in_game']:
+                    if v['pot'] != '-':
+                        pass
+                    else:
+                        return False
         return True
-
-    def __get_counter(self):
-        counter = self.client.get('counter')
-        if counter is None:
-            self.client.set('counter', json.dumps({'hand': 0, 'action': 0}))
-        counter = json.loads(self.client.get('counter'))
-
-        return counter['hand'], counter['action']
-

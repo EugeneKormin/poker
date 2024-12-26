@@ -1,13 +1,23 @@
-from src.core.PokerTableDistributor import PokerTableDistributor
-from src.core.Predictor import Predictor
-from src.utils.DataProcessor import extract_digits_from_predictions, extract_card_from_predictions, sort_cards
-from src.utils.ScreenCapture import ScreenCapture
+from client.src.core.PokerTableDistributor import PokerTableDistributor
+from client.src.core.Predictor import Predictor
+from client.src.utils.DataProcessor import extract_digits_from_predictions, extract_card_from_predictions, sort_cards
+from client.src.utils.ScreenCapture import ScreenCapture
+
+import redis
+import json
+
 
 screen_capture = ScreenCapture()
 poker_table_distributor = PokerTableDistributor()
 
 
 class PokerDataParser(object):
+    def __init__(self, config: dict):
+        REDIS_HOST: str = config['server']['url']
+        REDIS_PORT: str = config['server']['redis_port']
+        self.client = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+        self.__PLAYER_CARDS = []
+
     def __update(self, PLAYER_QUANTITY: int):
 
         self.__hand_count = 0
@@ -22,26 +32,25 @@ class PokerDataParser(object):
                 4: {'pot': '-', 'bet': '-', 'cards': [], 'in_game': False},
                 5: {'pot': '-', 'bet': '-', 'cards': [], 'in_game': False},
                 6: {'pot': '-', 'bet': '-', 'cards': [], 'in_game': False},
-                'board': {'cards': [], 'potential_bet': '0', 'actual_bet': '0', 'dealer_position': '0', 'my_position': '-'},
-                'action': False,
-                'counter': {'hand': 0, 'action': 0},
+                'board': {'dealer_position': '-', 'cards': [], 'potential_bet': '0', 'actual_bet': '0', 'hand_id': ''},
+                'player': {'cards': [], 'pot': '-', 'bet': '-', 'call': 0, 'position': '-', 'action': False, 'action_counter': 0},
+                'advice': ''
             }
 
         if PLAYER_QUANTITY == 8:
             self.__overall = {
                 'out_of_table': {},
-                1: {'pot': '-', 'bet': '-', 'cards': [], 'in_game': False},
-                2: {'pot': '-', 'bet': '-', 'cards': [], 'in_game': False},
-                3: {'pot': '-', 'bet': '-', 'cards': [], 'in_game': False},
-                4: {'pot': '-', 'bet': '-', 'cards': [], 'in_game': False},
-                5: {'pot': '-', 'bet': '-', 'cards': [], 'in_game': False},
-                6: {'pot': '-', 'bet': '-', 'cards': [], 'in_game': False},
-                7: {'pot': '-', 'bet': '-', 'cards': [], 'in_game': False},
-                8: {'pot': '-', 'bet': '-', 'cards': [], 'in_game': False},
-                'board': {'cards': [], 'potential_bet': '0', 'actual_bet': '0', 'dealer_position': '0',
-                          'my_position': '-'},
-                'action': False,
-                'counter': {'hand': 0, 'action': 0},
+                1: {'pot': '-', 'bet': '-', 'in_game': False},
+                2: {'pot': '-', 'bet': '-', 'in_game': False},
+                3: {'pot': '-', 'bet': '-', 'in_game': False},
+                4: {'pot': '-', 'bet': '-', 'in_game': False},
+                5: {'pot': '-', 'bet': '-', 'in_game': False},
+                6: {'pot': '-', 'bet': '-', 'in_game': False},
+                7: {'pot': '-', 'bet': '-', 'in_game': False},
+                8: {'pot': '-', 'bet': '-', 'in_game': False},
+                'board': {'dealer_position': '-', 'cards': [], 'potential_bet': '0', 'actual_bet': '0', 'hand_id': ''},
+                'player': {'cards': [], 'pot': '-', 'bet': '-', 'call': 0, 'position': '-', 'action': False, 'action_counter': 0},
+                'advice': ''
             }
 
     def __convert_bet_coords_to_digit_prediction(self, config,  coords, roi, MODEL_TYPE: str):
@@ -49,7 +58,11 @@ class PokerDataParser(object):
 
         try:
             preds = self.__predict.run(MODEL_TYPE=MODEL_TYPE, image=roi)
-            DIGIT = extract_digits_from_predictions(preds=preds)
+            DIGIT = extract_digits_from_predictions(preds=preds).replace('..', '.')
+            try:
+                float(DIGIT)
+            except ValueError:
+                DIGIT = '-'
             return BELONGS_TO, DIGIT
         except:
             return '-', 0
@@ -77,8 +90,9 @@ class PokerDataParser(object):
         
         preds = self.__predict.run(image=roi)
         
-        CARD = extract_card_from_predictions(preds=preds)
-        return BELONGS_TO, CARD
+        CARD, PRED_CHECK = extract_card_from_predictions(preds=preds)
+
+        return BELONGS_TO, CARD, PRED_CHECK
 
     def __convert_coords_to_player_position(self, config,  coords) -> str:
         BELONGS_TO = str(poker_table_distributor.distributed_cards2player_position(config=config, coords=coords))
@@ -127,18 +141,22 @@ class PokerDataParser(object):
 
         elif name == 'card' and len(coords) > 0:
             roi = screenshot[CENTER_Y-50:CENTER_Y+50, CENTER_X-40:CENTER_X+40]
-            BELONGS_TO, CARD = self.__convert_coords_to_card_prediction(coords=coords, roi=roi)
-            if BELONGS_TO != 0:
-                if BELONGS_TO == 'board':
-                    # update board cards
-                    self.__overall['board']['cards'].append(CARD)
-                if BELONGS_TO == 'player':
-                    # update player cards
-                    BELONGS_TO: str = self.__convert_coords_to_player_position(config=config, coords=coords)
-                    self.__overall[int(BELONGS_TO)]['cards'].append(CARD)
-                    # check player in any position
-                    if BELONGS_TO in ['1', '2', '3', '4', '5', '6', '7', '8']:
-                        self.__overall['board']['my_position'] = BELONGS_TO
+            # One method for both board and player cards detection.
+            BELONGS_TO, CARD, PRED_CHECK = self.__convert_coords_to_card_prediction(coords=coords, roi=roi)
+            if PRED_CHECK:
+                if BELONGS_TO != 0:
+                    if BELONGS_TO == 'board':
+                        # update board cards
+                        self.__overall['board']['cards'].append(CARD)
+
+                    if BELONGS_TO == 'player':
+                        # update player cards
+                        BELONGS_TO: str = self.__convert_coords_to_player_position(config=config, coords=coords)
+                        self.__overall[int(BELONGS_TO)]['cards'].append(CARD)
+                        self.__PLAYER_CARDS.append(CARD)
+                        # check player in any position
+                        if BELONGS_TO in ['1', '2', '3', '4', '5', '6', '7', '8']:
+                            self.__overall['player']['position'] = BELONGS_TO
 
         elif name == 'opponent':
             BELONGS_TO: str = self.__convert_coords_to_player_position(config=config, coords=coords)
@@ -146,26 +164,58 @@ class PokerDataParser(object):
                 self.__overall[int(BELONGS_TO)]['in_game'] = True
 
         elif name == 'action':
-            self.__overall['action'] = True
+            self.__overall['player']['action'] = True
 
+    def __update_player_data(self):
+        bet_list = []
+        for i in range(1, 7):
+            if self.__overall[i]['bet'] == '-':
+                bet_list.append(0)
+            else:
+                bet_list.append(float(self.__overall[i]['bet']))
+        MAX_BET = max(bet_list)
+
+        PLAYER_POSITION: int = self.__overall['player']['position']
+        if PLAYER_POSITION != '-':
+            player_data: dict = self.__overall[int(PLAYER_POSITION)]
+            PLAYER_BET = 0 if player_data['bet'] == '-' else float(self.__overall[int(PLAYER_POSITION)]['bet'])
+
+            self.__overall['player']['call'] = MAX_BET - PLAYER_BET
+            self.__overall['player']['pot'] = player_data['pot']
+            self.__overall['player']['bet'] = str(PLAYER_BET)
+            self.__overall['player']['cards'] = player_data['cards']
+            self.__overall[int(PLAYER_POSITION)]['in_game'] = True
 
     def run(self, predictor, config):
-        updated_screenshot = screen_capture.updated_screenshot
+        data = screen_capture.updated_screenshot
+        if len(data) == 0:
+            return
 
-        preds = predictor.run(MODEL_TYPE='board', image=updated_screenshot)
+        preds = predictor.run(MODEL_TYPE='board', image=data)
 
         names = preds[0].names
         boxes = preds[0].boxes
 
         self.__update(PLAYER_QUANTITY=config['board']['players'])
         for IDX, (cls, coords) in enumerate(zip(boxes.cls.tolist(), boxes.xyxy)):
-            self.__parse(IDX=IDX, name=names[int(cls)], coords=coords, screenshot=updated_screenshot, config=config)
+            self.__parse(IDX=IDX, name=names[int(cls)], coords=coords, screenshot=data, config=config)
 
         self.__overall['board']['cards'] = sort_cards(self.__overall['board']['cards'])
         for i in range(1, 7):
             if len(self.__overall[i]['cards']) > 0:
                 self.__overall[i]['cards'] = sort_cards(self.__overall[i]['cards'])
         self.__overall['board']['cards'] = sort_cards(self.__overall['board']['cards'])
+
+        if self.client.get(name='game-data') is None:
+            PREV_ACTION = False
+        else:
+            PREV_ACTION: bool = json.loads(self.client.get(name='game-data'))['player']['action']
+        CURRENT_ACTION: bool = self.__overall['player']['action']
+
+        self.__overall['action_started'] = True if not PREV_ACTION and CURRENT_ACTION else False
+        self.__overall['action_ended'] = False if not PREV_ACTION and CURRENT_ACTION else True
+
+        self.__update_player_data()
 
     @property
     def table_data(self):

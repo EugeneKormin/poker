@@ -1,12 +1,11 @@
-import cv2
 from ultralytics import YOLO
-import torch
 
 
 class Predictor(object):
     _instance = None
 
     def __new__(cls, config):
+
         if cls._instance is None:
             cls._instance = super(Predictor, cls).__new__(cls)
             cls._instance.__initialized = False

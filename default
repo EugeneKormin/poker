@@ -9,7 +9,7 @@ server {
         try_files $uri $uri/index.html =404;  # Try to serve requested URI or index.html
 
         # Add CORS headers
-        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Origin' '103.90.73.217' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
         add_header 'Access-Control-Allow-Headers' 'Origin, X-Requested-With, Content-Type, Accept' always;
 
@@ -24,7 +24,7 @@ server {
         try_files $uri $uri/ =404;  # Return 404 if the file is not found
 
         # Add CORS headers
-        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Origin' '103.90.73.217' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
         add_header 'Access-Control-Allow-Headers' 'Origin, X-Requested-With, Content-Type, Accept' always;
 
@@ -43,7 +43,7 @@ server {
         proxy_cache_bypass $http_upgrade;
 
         # Add CORS headers
-        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Origin' '103.90.73.217' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
         add_header 'Access-Control-Allow-Headers' 'Origin, X-Requested-With, Content-Type, Accept' always;
         

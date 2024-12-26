@@ -34,12 +34,32 @@
             gap: 10px; /* Промежуток между карточками */
         }
 
-        .player-card {
-            background-color: #e7f3fe; /* Цвет фона для карточек игроков */
+        .player-card-in {
+            background-color: #A4DBE8; /* Цвет фона для карточек игроков */
+            color: #000; /* Цвет текста */
             border: 1px solid #ccc;
             border-radius: 5px;
-            padding: 10px;
+            padding: 15px; /* Увеличенный отступ для лучшего восприятия */
             flex: 1; /* Карточки занимают равное пространство */
+            transition: background-color 0.3s ease; /* Плавный переход цвета фона */
+        }
+
+        .player-card-in:hover {
+            background-color: #8CC6D4; /* Темнее при наведении */
+        }
+
+        .player-card-out {
+            background-color: #000111; /* Цвет фона для карточек игроков */
+            color: #FFF; /* Цвет текста */
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 15px; /* Увеличенный отступ для лучшего восприятия */
+            flex: 1; /* Карточки занимают равное пространство */
+            transition: background-color 0.3s ease; /* Плавный переход цвета фона */
+        }
+
+        .player-card-out:hover {
+            background-color: #1A1C20; /* Светлее при наведении */
         }
     </style>
 </head>
@@ -51,14 +71,30 @@
             <div class="player-block" id="player-updates-2"></div> <!-- Блок для следующих четырех игроков в обратном порядке -->
         </div>
         <div id="board-update" class="update"></div> <!-- Блок обновлений для стола -->
-        <div id="action-update" class="update"></div> <!-- Блок обновлений для действий -->
-        <div id="counter-update" class="update"></div> <!-- Блок обновлений для счётчика -->
+        <div id="player-update" class="update"></div> <!-- Блок обновлений для действий -->
         <div id="advice-update" class="update"></div> <!-- Блок обновлений для совета -->
     </div>
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            const eventSource = new EventSource('http://103.90.73.217:8001/stream');
+            const eventSource = new EventSource('http://103.90.73.217/stream');
+
+            // Массив для хранения карточек игроков
+            const playerCards = [];
+
+            // Создание карточек игроков
+            for (let player = 1; player <= 8; player++) {
+                const playerCard = document.createElement('div');
+                playerCard.className = 'player-card'; // Общий класс для всех карточек
+                playerCards.push(playerCard);
+
+                // Добавляем карточку в соответствующий блок
+                if (player <= 4) {
+                    document.getElementById('player-updates-1').appendChild(playerCard);
+                } else {
+                    document.getElementById('player-updates-2').appendChild(playerCard);
+                }
+            }
 
             eventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);
@@ -66,81 +102,67 @@
 
                 // Обновление блоков с данными
                 updatePlayers(data);
-                updateBoard(data.board, data.not_accepted_bet); // Передаем непринятую ставку
-                updateAction(data.action);
-                updateCounter(data.counter);
-                updateAdvice(data.advice); // Если у вас есть данные о совете
+                updateBoard(data.board, data.not_accepted_bet);
+                updatePlayer(data.player);
+                updateAdvice(data.advice);
             };
 
             function updatePlayers(data) {
-                const playerUpdates1 = document.getElementById('player-updates-1');
-                const playerUpdates2 = document.getElementById('player-updates-2');
-
-                playerUpdates1.innerHTML = ""; 
-                playerUpdates2.innerHTML = ""; 
-
                 for (let player = 1; player <= 8; player++) {
                     const playerData = data[player] || {};
                     const potValue = playerData.pot || 'Игрок сбросил карты';
                     const betValue = playerData.bet || 'ставка отсутствует';
                     const isInGameText = playerData.in_game ? ' в игре' : ' Сбросил карты';
 
-                    const playerCard = document.createElement('div');
-                    playerCard.className = 'player-card';
+                    // Определяем класс для карточки игрока в зависимости от статуса
+                    const playerCardClass = playerData.in_game ? 'player-card-in' : 'player-card-out';
 
-                    // Каждая карточка игрока содержит строки информации
-                    playerCard.innerHTML = `
+                    // Обновление содержимого карточки игрока
+                    playerCards[player - 1].className = playerCardClass; // Применяем соответствующий класс
+                    playerCards[player - 1].innerHTML = `
                         <p>Игрок ${player}${isInGameText}</p>
                         <p>Пот: ${potValue} BB</p>
                         <p>Текущая ставка: ${betValue} BB</p>
                     `;
-
-                    // Добавляем игрока в соответствующий блок
-                    if (player <= 4) {
-                        playerUpdates1.appendChild(playerCard); // Первые четыре игрока
-                    } else {
-                        playerUpdates2.appendChild(playerCard); // Последние четыре игрока
-                    }
                 }
             }
 
             function updateBoard(board, notAcceptedBet) {
                 const boardUpdateDiv = document.getElementById('board-update');
-                
+
                 boardUpdateDiv.innerHTML = ""; // Очистка предыдущего содержимого
 
                 if (board && typeof board === 'object') {
                     boardUpdateDiv.innerHTML = `
                         <p>Карты на доске: ${board.cards.length > 0 ? board.cards.join(', ') : 'Нет'}</p>
-                        <p>Принятая ставка: $${board.actual_bet}</p>
-                        <p>Непринятая ставка: $${board.potential_bet || 'Нет'}</p> <!-- Добавлено отображение непринятой ставки -->
+                        <p>Принятая ставка: ${board.actual_bet} BB</p>
+                        <p>Непринятая ставка: ${board.potential_bet || 'Нет'} BB</p>
+                        <p>Позиция диллера: ${board.dealer_position}</p>
+                        <p>Идентификатор руки: ${board.hand_id}</p>
                     `;
                 }
             }
 
-            function updateAction(action) {
-                const actionUpdateDiv = document.getElementById('action-update');
-                
-                actionUpdateDiv.innerHTML = `<p>Действие игрока: ${action}</p>`;
-            }
+            function updatePlayer(player) {
+                const actionUpdateDiv = document.getElementById('player-update');
 
-            function updateCounter(counter) {
-                const counterUpdateDiv = document.getElementById('counter-update');
-                
-                counterUpdateDiv.innerHTML = `
-                <p>Внутреняя информация</p> 
-                <p>Кол-во рук: ${counter.hand}</p>
-                <p>Порядковый номер хода: ${counter.action}</p>
+                actionUpdateDiv.innerHTML = `
+                    <p>Информация о игроке:</p>
+                    <p>Позиция за столом: ${player.position}</p>
+                    <p>Очередь игрока делать действие? ${player.action}</p>
+                    <p>Карты: ${player.cards.join(', ')}</p>
+                    <p>Размер стека: ${player.pot}</p>
+                    <p>Стоимость Call: ${player.call}</p>
+                    <p>Размер ставки: ${player.bet}</p>
+                    <p>Номер действия в руке: ${player.action_counter}
                 `;
             }
 
             function updateAdvice(advice) {
                 const adviceUpdateDiv = document.getElementById('advice-update');
-                
                 adviceUpdateDiv.innerHTML = `<p>Совет: ${advice || 'Нет совета'}</p>`;
             }
         });
     </script>
 </body>
 </html>
-
