@@ -1,10 +1,11 @@
-Certainly! Here is the complete documentation with the client-side setup and usage details added:
 
 ---
 
 # Poker Assistant System
 
 The **Poker Assistant System** is an advanced solution designed to process poker game screen captures, analyze game states using machine learning models, and provide actionable advice via a locally hosted API. This project enables real-time gameplay monitoring, state management, and AI-driven decision-making, optimized for use in both 6-player and 8-player poker tables.
+
+**Note:** This system is a **pre-alpha prototype** and is not a complete or production-ready version. Several core features and optimizations are still in development, and the system is not fully tested. **No CI/CD pipelines**, unit tests, or full production-grade error handling have been implemented as of now.
 
 ---
 
@@ -171,7 +172,7 @@ The **client-side** of the system is responsible for interacting with the user's
    - Server address for the backend API.
    - Log file paths.
 
-The **client-side** also includes utilities for managing screen capture regions, sorting cards, and organizing game state data. 
+The **client-side** also includes utilities for managing screen capture regions, sorting cards, and organizing game state data.
 
 ---
 
@@ -211,7 +212,13 @@ logging:
 - **Cross-Platform**: The client-side has primarily been tested on Windows. If you're using a different operating system (e.g., Linux), additional adjustments may be required.
 - **Redis Server**: The Redis server is already running on a remote server. Ensure that the client has access to this server to stream game data in real-time.
 
-### Issues Identified
+### Known Issues and Limitations
+This is a **pre-alpha prototype**. While the core functionality is in place, several critical features and improvements are still missing or in progress. Some of the key limitations include:
+
+- **Lack of Unit Tests**: There are currently no automated tests for the system, meaning some areas of the code may not be thoroughly validated.
+- **CI/CD**: No Continuous Integration / Continuous Deployment (CI/CD) pipelines have been set
+
+
 While the system is functional and operational, the following issues have been identified and require attention for a more polished production experience:
 
 1. **Card Detection**:
@@ -222,6 +229,3 @@ While the system is functional and operational, the following issues have been i
 
 3. **Player Pot Detection**:
    - In some cases, the player's pots for tables with 6 or 8 players are duplicated. This issue also arises from limited training data, causing the system to misinterpret certain areas of the screen.
-
-### Solution Paths
-
