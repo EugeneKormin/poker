@@ -5,7 +5,25 @@
 
 The **Poker Assistant System** is an advanced solution designed to process poker game screen captures, analyze game states using machine learning models, and provide actionable advice via a locally hosted API. This project enables real-time gameplay monitoring, state management, and AI-driven decision-making, optimized for use in both 6-player and 8-player poker tables.
 
-**Note:** This system is a **pre-alpha prototype** and is not a complete or production-ready version. Several core features and optimizations are still in development, and the system is not fully tested. **No CI/CD pipelines**, unit tests, or full production-grade error handling have been implemented as of now. Tested on 'Move table style/BB'.
+**Notes**: This system is a pre-alpha prototype and is not yet a complete or production-ready version. Several core features and optimizations are still under development, and the system has not undergone comprehensive testing.
+## Current Status
+Development Stage: Pre-alpha
+Testing Environment: Conducted on 'Move table style/BB'
+Integration: Compatible with LM Studio
+## Key Features
+Provides advice exclusively when the player is actively engaged in gameplay.
+Designed to enhance user experience by offering strategic insights.
+## Limitations
+CI/CD Pipelines: Not implemented.
+Unit Tests: Absent at this stage.
+Error Handling: Lacks full production-grade error handling.
+## Future Development
+As this project evolves, we aim to integrate robust testing frameworks, establish CI/CD pipelines, and enhance error management to ensure a reliable and efficient user experience. Your feedback during this pre-alpha phase is invaluable as we work towards these goals.
+
+-
+
+
+Thank you for your interest and support!
 
 ---
 
