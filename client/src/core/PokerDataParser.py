@@ -215,12 +215,16 @@ class PokerDataParser(object):
         self.__overall['action_started'] = True if not PREV_ACTION and CURRENT_ACTION else False
         self.__overall['action_ended'] = False if not PREV_ACTION and CURRENT_ACTION else True
 
+        '''
+        Prompt id tracking is not implemented yet.
+        
         if self.client.get('game-data')['new_hand']:
-            table_data['new_hand'] = False
-            JSON_DATA = json.dumps(table_data)
+            self.table_data['new_hand'] = False
+            JSON_DATA = json.dumps(self.table_data)
             self.client.set('game-data', JSON_DATA)
             self.__overall['current_prompt_id'] = random.choice(range(1, 11))
             print(self.__overall['current_prompt_id'])
+        '''
 
         self.__update_player_data()
 
