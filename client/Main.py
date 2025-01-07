@@ -6,7 +6,7 @@ from client.src.services.SLM import SLM
 
 
 def run():
-    config = load_config(config_path='./client/config/config.yaml')
+    config = load_config(config_path='./config/config.yaml')
 
     predictor = Predictor(config=config)
     poker_data_parser = PokerDataParser(config=config)
